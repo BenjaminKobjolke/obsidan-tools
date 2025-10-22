@@ -78,15 +78,15 @@ class MarkdownParser:
             file_path: Path to the markdown file
 
         Returns:
-            List of resource file paths (e.g., ['_resources/video.mp4', '_resources/image.png'])
+            List of resource file references (e.g., ['image.png', '_resources/video.mp4'])
         """
         try:
             content = file_path.read_text(encoding='utf-8')
 
-            # Match both ![[_resources/...]] (embedded) and [[_resources/...]] (linked) patterns
-            # The !? makes the exclamation mark optional
-            # This captures both the file path and any display text after |
-            pattern = r'!?\[\[(_resources/[^\]|]+)'
+            # Match all embedded files: ![[filename]] or ![[path/filename]]
+            # Captures the full path/filename before | or ]
+            # Only matches embedded files (with !), not wiki links
+            pattern = r'!\[\[([^\]|]+)'
             matches = re.findall(pattern, content)
 
             return matches

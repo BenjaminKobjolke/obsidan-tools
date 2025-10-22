@@ -1,17 +1,33 @@
-# Obsidian Sorter
+# Obsidian Tools
 
-A Python tool to organize Obsidian markdown files into year-based subdirectories based on their YAML frontmatter dates. It also handles moving associated resource files (images, videos, etc.) referenced in the markdown files.
+A collection of Python tools for managing Obsidian markdown files. Currently includes functionality to organize markdown files into year-based subdirectories based on their YAML frontmatter dates, with support for moving associated resource files.
 
 ## Features
 
+### Sort by Year Mode
 - Sorts markdown files into year-based subdirectories (e.g., `2023/`, `2024/`)
 - Extracts year from YAML frontmatter `Created at:` field
 - Fallback to YYYYMMDD_ filename pattern if frontmatter is missing
-- Moves associated resource files from `_resources/` directory
-- Intelligent duplicate handling with file hash comparison
-- Automatic renaming of conflicting files
-- Updates markdown links when resources are renamed
+- Moves associated resource files with markdown files
+
+### Sort Resources Mode
+- Detects ALL embedded files in markdown (images, videos, PDFs, etc.)
+- Supports multiple Obsidian link formats:
+  - `![[filename.png]]` - direct filename
+  - `![[_resources/filename.png]]` - with path prefix
+  - `![[folder/subfolder/file.pdf]]` - nested paths
+  - `![[image.png|display text]]` - with display text
+- Optimizes resource file locations based on usage
+- Moves resources to lowest common ancestor directory
+- Finds resources recursively throughout directory tree
+- Detects and warns about duplicate filenames with different content
+- Updates markdown links automatically when resources move
+
+### General
+- Works with all Obsidian embedded file formats
+- Intelligent duplicate handling with SHA256 hash comparison
 - Dry-run mode by default to preview changes
+- Detailed reporting of all operations
 
 ## Requirements
 
@@ -33,12 +49,15 @@ install.bat
 
 ```
 obsidian-tools/
-├── obsidian_sorter/           # Main package
+├── obsidian_tools/            # Main package
 │   ├── __init__.py            # Package initialization
 │   ├── cli.py                 # Command-line interface
-│   ├── file_sorter.py         # Main sorting orchestration
+│   ├── file_sorter.py         # Sort by year: main orchestration
 │   ├── markdown_parser.py     # Markdown parsing and date extraction
-│   ├── resource_manager.py    # Resource file management
+│   ├── resource_manager.py    # Resource file management (sort-by-year)
+│   ├── resource_locator.py    # Find resources recursively
+│   ├── resource_analyzer.py   # Analyze resource usage
+│   ├── resource_optimizer.py  # Optimize resource locations (sort-resources)
 │   └── utils/
 │       ├── __init__.py
 │       └── file_hasher.py     # File hashing utilities
@@ -49,29 +68,60 @@ obsidian-tools/
 
 ## Usage
 
-### Basic Usage
+### Sort by Year Mode
 
 Dry-run mode (preview changes without moving files):
 ```bash
-python -m obsidian_sorter.cli --path "C:\path\to\markdown\files"
+python -m obsidian_tools.cli --mode sort-by-year --path "C:\path\to\markdown\files"
 ```
 
 Execute mode (actually move files):
 ```bash
-python -m obsidian_sorter.cli --path "C:\path\to\markdown\files" --execute
+python -m obsidian_tools.cli --mode sort-by-year --path "C:\path\to\markdown\files" --execute
 ```
 
-### With Resources
-
-Move markdown files and their associated resources:
+With resources:
 ```bash
-python -m obsidian_sorter.cli --path "C:\path\to\markdown\files" --resources "C:\path\to\_resources" --execute
+python -m obsidian_tools.cli --mode sort-by-year --path "C:\path\to\markdown\files" --resources "C:\path\to\_resources" --execute
 ```
+
+### Sort Resources Mode
+
+Analyze and optimize resource locations (dry-run):
+```bash
+python -m obsidian_tools.cli --mode sort-resources --path "E:\Notes"
+```
+
+Execute optimization:
+```bash
+python -m obsidian_tools.cli --mode sort-resources --path "E:\Notes" --execute
+```
+
+This mode:
+1. Scans all markdown files for ALL embedded file references (`![[...]]`)
+2. Detects any Obsidian link format (with or without path prefixes)
+3. Locates resources recursively in the directory tree
+4. Calculates the optimal location (lowest common ancestor)
+5. Moves resources to minimize path lengths
+6. Updates all markdown links automatically
+
+**Supported link formats:**
+- `![[Pasted image.png]]` → Finds image anywhere in directory tree
+- `![[_resources/chart.png]]` → Handles existing organized resources
+- `![[images/photo.jpg]]` → Works with custom folder structures
+- `![[document.pdf|My Document]]` → Preserves display text
+
+**Example:**
+- MD file: `E:\Notes\XIDA\Meetings\2025\meeting.md` contains `![[chart.png]]`
+- Resource found at: `E:\Notes\_resources\chart.png`
+- Optimized to: `E:\Notes\XIDA\Meetings\2025\_resources\chart.png`
+- Link updated to: `![[_resources/chart.png]]`
 
 ### Command-line Arguments
 
+- `--mode`: (Required) Operation mode (`sort-by-year` or `sort-resources`)
 - `--path`: (Required) Path to directory containing markdown files
-- `--resources`: (Optional) Path to `_resources` directory containing media files
+- `--resources`: (Optional) Path to `_resources` directory (only for `sort-by-year` mode)
 - `--execute`: (Optional) Actually move files (default is dry-run mode)
 
 ## How It Works
