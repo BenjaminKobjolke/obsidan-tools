@@ -1,15 +1,17 @@
-# Markdown File Organizer by Year
+# Obsidian Sorter
 
-A Python script that automatically organizes markdown files into year-based subdirectories based on their creation date. Designed for Obsidian notes but works with any markdown files.
+A Python tool to organize Obsidian markdown files into year-based subdirectories based on their YAML frontmatter dates. It also handles moving associated resource files (images, videos, etc.) referenced in the markdown files.
 
 ## Features
 
-- **Automatic year extraction** from YAML frontmatter `Created at` field
-- **Fallback to filename parsing** for files with `YYYYMMDD_` date prefix
-- **Resource file handling** - Automatically moves associated media files (images, videos, zip files, etc.)
-- **Intelligent conflict resolution** using SHA256 hashing
-- **Dry-run mode** by default to preview changes before executing
-- **Cross-platform** support (Windows, macOS, Linux)
+- Sorts markdown files into year-based subdirectories (e.g., `2023/`, `2024/`)
+- Extracts year from YAML frontmatter `Created at:` field
+- Fallback to YYYYMMDD_ filename pattern if frontmatter is missing
+- Moves associated resource files from `_resources/` directory
+- Intelligent duplicate handling with file hash comparison
+- Automatic renaming of conflicting files
+- Updates markdown links when resources are renamed
+- Dry-run mode by default to preview changes
 
 ## Requirements
 
@@ -18,141 +20,150 @@ A Python script that automatically organizes markdown files into year-based subd
 
 ## Installation
 
-1. Clone or download this repository
-2. Ensure Python 3.10+ is installed:
-   ```bash
-   python --version
-   ```
+```bash
+# Clone the repository
+git clone https://github.com/BenjaminKobjolke/obsidian-tools.git
+cd obsidian-tools
+
+# Run the install script (creates venv and installs dependencies)
+install.bat
+```
+
+## Project Structure
+
+```
+obsidian-tools/
+├── obsidian_sorter/           # Main package
+│   ├── __init__.py            # Package initialization
+│   ├── cli.py                 # Command-line interface
+│   ├── file_sorter.py         # Main sorting orchestration
+│   ├── markdown_parser.py     # Markdown parsing and date extraction
+│   ├── resource_manager.py    # Resource file management
+│   └── utils/
+│       ├── __init__.py
+│       └── file_hasher.py     # File hashing utilities
+├── sort_md_by_year.py         # Legacy script (for reference)
+├── requirements.txt
+└── README.md
+```
 
 ## Usage
 
+### Basic Usage
+
+Dry-run mode (preview changes without moving files):
 ```bash
-python sort_md_by_year.py --path <path_to_notes> [--resources <path_to_resources>] [--execute]
+python -m obsidian_sorter.cli --path "C:\path\to\markdown\files"
 ```
 
-### Arguments
-
-- `--path` (required): Directory containing markdown files to organize
-- `--resources` (optional): Path to `_resources` directory containing media files
-- `--execute` (optional): Actually move files (default is dry-run mode)
-
-## Examples
-
-### Preview what would be organized (dry-run)
+Execute mode (actually move files):
 ```bash
-python sort_md_by_year.py --path "C:\Users\YourName\Documents\Notes"
+python -m obsidian_sorter.cli --path "C:\path\to\markdown\files" --execute
 ```
 
-### Preview with resource files
+### With Resources
+
+Move markdown files and their associated resources:
 ```bash
-python sort_md_by_year.py --path "C:\Users\YourName\Documents\Notes" --resources "C:\Users\YourName\Documents\Notes\_resources"
+python -m obsidian_sorter.cli --path "C:\path\to\markdown\files" --resources "C:\path\to\_resources" --execute
 ```
 
-### Actually organize files
-```bash
-python sort_md_by_year.py --path "C:\Users\YourName\Documents\Notes" --resources "C:\Users\YourName\Documents\Notes\_resources" --execute
-```
+### Command-line Arguments
+
+- `--path`: (Required) Path to directory containing markdown files
+- `--resources`: (Optional) Path to `_resources` directory containing media files
+- `--execute`: (Optional) Actually move files (default is dry-run mode)
 
 ## How It Works
 
-### Date Extraction Priority
+### Date Extraction
 
-1. **Primary**: Reads YAML frontmatter for `Created at` field
+The tool extracts the year from markdown files in the following order:
+
+1. **YAML Frontmatter**: Looks for `Created at: YYYY-MM-DD` in the frontmatter
    ```yaml
    ---
-   Created at: 2020-07-21 13:38:21
-   Last updated at: 2020-07-21 13:38:21
-   Author: Benjamin Kobjolke <b.kobjolke@xida.de>
+   Created at: 2024-03-15
    ---
    ```
 
-2. **Fallback**: Extracts date from filename if it starts with `YYYYMMDD_`
+2. **Filename Pattern**: Falls back to YYYYMMDD_ pattern at the start of the filename
    ```
-   20250912_meeting_notes.md → Year: 2025
+   20240315_my-note.md
    ```
 
 ### File Organization
 
+Files are organized into year-based subdirectories:
 ```
-Before:
-├── note1.md (Created: 2020)
-├── note2.md (Created: 2021)
-├── 20220315_report.md
+before/
+├── 20230115_note1.md
+├── 20240315_note2.md
 └── _resources/
-    ├── video.mp4
-    └── document.zip
+    ├── image1.png
+    └── video1.mp4
 
-After:
-├── 2020/
-│   ├── note1.md
+after/
+├── 2023/
+│   ├── 20230115_note1.md
 │   └── _resources/
-│       └── video.mp4
-├── 2021/
-│   └── note2.md
-└── 2022/
-    ├── 20220315_report.md
+│       └── image1.png
+└── 2024/
+    ├── 20240315_note2.md
     └── _resources/
-        └── document.zip
+        └── video1.mp4
 ```
 
-### Resource File Handling
+### Resource Handling
 
-The script automatically detects and moves resource files referenced in your markdown:
+- Extracts resource links matching `![[_resources/filename]]` pattern
+- Moves resources to year-specific `_resources/` subdirectories
+- Compares file hashes to detect duplicates
+- Renames conflicting files with numeric suffixes (e.g., `image_1.png`)
+- Updates markdown links when resources are renamed
 
-- Embedded resources: `![[_resources/image.png]]`
-- Linked resources: `[[_resources/file.zip|file.zip]]`
+## Classes and Modules
 
-Resources are moved to `<year>/_resources/` alongside their markdown files.
+### `FileSorter` (file_sorter.py)
+Main orchestration class that coordinates the sorting process.
 
-## Edge Cases
+### `MarkdownParser` (markdown_parser.py)
+Handles parsing markdown files:
+- `extract_year_from_frontmatter()`: Extract year from YAML frontmatter
+- `extract_year_from_filename()`: Extract year from filename pattern
+- `extract_resource_links()`: Find resource file references
+- `update_resource_link()`: Update markdown links
 
-### Conflict Resolution
+### `ResourceManager` (resource_manager.py)
+Manages resource file operations:
+- `move_resource_file()`: Move individual resource with conflict handling
+- `move_resources_for_markdown()`: Move all resources for a markdown file
+- `get_unique_filename()`: Generate unique filenames for conflicts
 
-**Markdown files**: If a file with the same name already exists in the target year directory, the file is skipped with a warning.
+### `FileHasher` (utils/file_hasher.py)
+File hashing utilities:
+- `compute_hash()`: Calculate SHA256 hash of a file
+- `files_are_identical()`: Compare two files by hash
 
-**Resource files**:
-- If target resource exists with **identical content** (SHA256 hash match): File is skipped
-- If target resource exists with **different content**: New file is renamed (e.g., `video_1.mp4`) and the markdown link is automatically updated
-
-### Missing Resources
-
-If a markdown file references a resource that doesn't exist, a warning is displayed but the markdown file is still moved.
-
-### Files Without Dates
-
-Files without YAML frontmatter or filename date patterns are skipped.
-
-## Output Example
+## Example Output
 
 ```
-Found 1204 markdown file(s)
-Resources directory: E:\Notes\_resources
-Mode: EXECUTE
+Found 5 markdown file(s)
+Resources directory: C:\path\to\_resources
+Mode: DRY-RUN (use --execute to actually move files)
 ------------------------------------------------------------
-MOVED: project_notes.md -> 2020/project_notes.md
-  RESOURCE: video.mp4
-  RESOURCE: diagram.png
-MOVED: meeting_minutes.md -> 2021/meeting_minutes.md
-  RESOURCE (identical): shared_logo.png
-SKIP (no date): README.md
+WOULD MOVE: 20230115_note1.md -> 2023/20230115_note1.md
+  WOULD MOVE RESOURCE: image1.png
+WOULD MOVE: 20240315_note2.md -> 2024/20240315_note2.md
+  WOULD MOVE RESOURCE: video1.mp4
+SKIP (no date): readme.md
 ------------------------------------------------------------
 Summary:
-  Moved: 1202
-  Skipped (no date): 2
+  Would move: 2
+  Skipped (no date): 1
   Skipped (exists): 0
-  Resources moved: 1850
-  Resources renamed: 5
-  Resources missing: 3
+  Resources moved: 2
 ```
-
-## Supported File Types
-
-All file types referenced in `_resources/` are supported:
-- Images (`.png`, `.jpg`, `.gif`, etc.)
-- Videos (`.mp4`, `.mov`, `.avi`, etc.)
-- Documents (`.pdf`, `.docx`, etc.)
-- Archives (`.zip`, `.tar.gz`, etc.)
-- Any other file type
 
 ## License
 
